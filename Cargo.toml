@@ -1,0 +1,7 @@
+[package]
+name = "lichess-tv-tui"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+ureq = "3.0.12"
