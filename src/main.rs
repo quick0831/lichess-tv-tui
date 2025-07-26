@@ -1,7 +1,9 @@
 use std::{
-    io::{self, BufRead, BufReader},
+    io::{BufRead, BufReader},
     str::FromStr,
 };
+
+use color_eyre::Result;
 
 use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind};
 use ratatui::{
@@ -102,12 +104,22 @@ where
     deserializer.deserialize_str(StrVisitor)
 }
 
-fn main() -> io::Result<()> {
+fn main() -> Result<()> {
+    set_panic_hook();
+    color_eyre::install()?;
     std::thread::spawn(get_lichess_tv);
     let mut terminal = ratatui::init();
     let app_result = App::default().run(&mut terminal);
     ratatui::restore();
     app_result
+}
+
+fn set_panic_hook() {
+    let hook = std::panic::take_hook();
+    std::panic::set_hook(Box::new(move |panic_info| {
+        ratatui::restore();
+        hook(panic_info);
+    }));
 }
 
 fn get_lichess_tv() {
@@ -138,7 +150,7 @@ pub struct App {
 
 impl App {
     /// runs the application's main loop until the user quits
-    pub fn run(&mut self, terminal: &mut DefaultTerminal) -> io::Result<()> {
+    pub fn run(&mut self, terminal: &mut DefaultTerminal) -> Result<()> {
         while !self.exit {
             terminal.draw(|frame| self.draw(frame))?;
             self.handle_events()?;
@@ -150,7 +162,7 @@ impl App {
         frame.render_widget(self, frame.area());
     }
 
-    fn handle_events(&mut self) -> io::Result<()> {
+    fn handle_events(&mut self) -> Result<()> {
         match event::read()? {
             Event::Key(key_event) if key_event.kind == KeyEventKind::Press => {
                 self.handle_key_event(key_event)
@@ -159,7 +171,7 @@ impl App {
         }
     }
 
-    fn handle_key_event(&mut self, key_event: KeyEvent) -> io::Result<()> {
+    fn handle_key_event(&mut self, key_event: KeyEvent) -> Result<()> {
         match key_event.code {
             KeyCode::Char('q') => self.exit(),
             KeyCode::Left => self.decrement_counter(),
