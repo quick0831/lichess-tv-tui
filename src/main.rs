@@ -149,7 +149,6 @@ fn get_lichess_tv(tx: SyncSender<TvData>) {
 pub struct App {
     rx: Receiver<TvData>,
     data: Fen,
-    counter: u8,
     exit: bool,
 }
 
@@ -158,7 +157,6 @@ impl App {
         App {
             rx,
             data: Fen::empty(),
-            counter: 0,
             exit: false,
         }
     }
@@ -193,8 +191,6 @@ impl App {
     fn handle_key_event(&mut self, key_event: KeyEvent) -> Result<()> {
         match key_event.code {
             KeyCode::Char('q') => self.exit(),
-            KeyCode::Left => self.decrement_counter(),
-            KeyCode::Right => self.increment_counter(),
             _ => {}
         }
         Ok(())
@@ -217,35 +213,20 @@ impl App {
     fn exit(&mut self) {
         self.exit = true;
     }
-
-    fn increment_counter(&mut self) {
-        self.counter += 1;
-    }
-
-    fn decrement_counter(&mut self) {
-        self.counter -= 1;
-    }
 }
 
 impl Widget for &App {
     fn render(self, area: Rect, buf: &mut Buffer) {
-        let title = Line::from(" Counter App Tutorial ".bold());
-        let instructions = Line::from(vec![
-            " Decrement ".into(),
-            "<Left>".blue().bold(),
-            " Increment ".into(),
-            "<Right>".blue().bold(),
-            " Quit ".into(),
-            "<Q> ".blue().bold(),
-        ]);
+        let title = Line::from(" Lichess TV ".bold());
+        let instructions = Line::from(vec![" Quit ".into(), "<Q> ".blue().bold()]);
         let block = Block::bordered()
             .title(title.centered())
             .title_bottom(instructions.centered())
             .border_set(border::THICK);
 
         let mut counter_text = Text::from(vec![Line::from(vec![
-            "Value: ".into(),
-            self.counter.to_string().yellow(),
+            "Fullmoves: ".into(),
+            self.data.as_setup().fullmoves.to_string().into(),
         ])]);
 
         for line in format!("{:?}", self.data.as_setup().board).split("\n") {
