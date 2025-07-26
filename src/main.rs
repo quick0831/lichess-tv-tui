@@ -1,6 +1,8 @@
 use std::{
     io::{BufRead, BufReader},
     str::FromStr,
+    sync::mpsc::{Receiver, SyncSender, TryRecvError, sync_channel},
+    time::Duration,
 };
 
 use color_eyre::Result;
@@ -22,7 +24,7 @@ use shakmaty::{Square, fen::Fen};
 #[allow(clippy::large_enum_variant)]
 #[derive(Debug, Deserialize)]
 #[serde(tag = "t", content = "d")]
-enum TvData {
+pub enum TvData {
     #[serde(rename = "featured")]
     Featured(FeaturedData),
     #[serde(rename = "fen")]
@@ -31,7 +33,7 @@ enum TvData {
 
 #[allow(dead_code)]
 #[derive(Debug, Deserialize)]
-struct FeaturedData {
+pub struct FeaturedData {
     id: String,
     orientation: Color,
     players: [Player; 2],
@@ -40,7 +42,7 @@ struct FeaturedData {
 
 #[allow(dead_code)]
 #[derive(Debug, Deserialize)]
-struct Player {
+pub struct Player {
     color: Color,
     user: User,
     rating: i32,
@@ -49,7 +51,7 @@ struct Player {
 
 #[allow(dead_code)]
 #[derive(Debug, Deserialize)]
-struct User {
+pub struct User {
     name: String,
     title: Option<String>,
     flair: Option<String>,
@@ -60,7 +62,7 @@ struct User {
 
 #[allow(dead_code)]
 #[derive(Debug, Deserialize)]
-struct FenData {
+pub struct FenData {
     fen: Fen,
     #[serde(deserialize_with = "parse_lm")]
     lm: [Square; 2],
@@ -70,7 +72,7 @@ struct FenData {
 
 #[allow(dead_code)]
 #[derive(Debug, Deserialize)]
-enum Color {
+pub enum Color {
     #[serde(rename = "white")]
     White,
     #[serde(rename = "black")]
@@ -107,9 +109,10 @@ where
 fn main() -> Result<()> {
     set_panic_hook();
     color_eyre::install()?;
-    std::thread::spawn(get_lichess_tv);
+    let (tx, rx) = sync_channel(0);
+    std::thread::spawn(|| get_lichess_tv(tx));
     let mut terminal = ratatui::init();
-    let app_result = App::default().run(&mut terminal);
+    let app_result = App::new(rx).run(&mut terminal);
     ratatui::restore();
     app_result
 }
@@ -122,7 +125,7 @@ fn set_panic_hook() {
     }));
 }
 
-fn get_lichess_tv() {
+fn get_lichess_tv(tx: SyncSender<TvData>) {
     let a = ureq::get("https://lichess.org/api/tv/feed")
         .call()
         .unwrap()
@@ -134,7 +137,7 @@ fn get_lichess_tv() {
     for line in a.lines() {
         match line {
             Ok(line) => match serde_json::from_str::<TvData>(&line) {
-                Ok(_data) => { /* println!("{:?}", data) */ }
+                Ok(data) => tx.send(data).expect("channel is closed"),
                 Err(err) => panic!("JSON parse failed: {err}"),
             },
             Err(_) => todo!(),
@@ -142,18 +145,30 @@ fn get_lichess_tv() {
     }
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct App {
+    rx: Receiver<TvData>,
+    data: Fen,
     counter: u8,
     exit: bool,
 }
 
 impl App {
+    pub fn new(rx: Receiver<TvData>) -> Self {
+        App {
+            rx,
+            data: Fen::empty(),
+            counter: 0,
+            exit: false,
+        }
+    }
+
     /// runs the application's main loop until the user quits
     pub fn run(&mut self, terminal: &mut DefaultTerminal) -> Result<()> {
         while !self.exit {
             terminal.draw(|frame| self.draw(frame))?;
             self.handle_events()?;
+            self.handle_api_events()?;
         }
         Ok(())
     }
@@ -163,6 +178,10 @@ impl App {
     }
 
     fn handle_events(&mut self) -> Result<()> {
+        let timeout = Duration::from_millis(20);
+        if !event::poll(timeout)? {
+            return Ok(());
+        }
         match event::read()? {
             Event::Key(key_event) if key_event.kind == KeyEventKind::Press => {
                 self.handle_key_event(key_event)
@@ -179,6 +198,20 @@ impl App {
             _ => {}
         }
         Ok(())
+    }
+
+    fn handle_api_events(&mut self) -> Result<()> {
+        match self.rx.try_recv() {
+            Ok(data) => {
+                self.data = match data {
+                    TvData::Featured(data) => data.fen,
+                    TvData::Fen(data) => data.fen,
+                };
+                Ok(())
+            }
+            Err(TryRecvError::Empty) => Ok(()),
+            Err(TryRecvError::Disconnected) => Err(TryRecvError::Disconnected)?,
+        }
     }
 
     fn exit(&mut self) {
@@ -210,10 +243,14 @@ impl Widget for &App {
             .title_bottom(instructions.centered())
             .border_set(border::THICK);
 
-        let counter_text = Text::from(vec![Line::from(vec![
+        let mut counter_text = Text::from(vec![Line::from(vec![
             "Value: ".into(),
             self.counter.to_string().yellow(),
         ])]);
+
+        for line in format!("{:?}", self.data.as_setup().board).split("\n") {
+            counter_text.push_line(line.to_owned());
+        }
 
         Paragraph::new(counter_text)
             .centered()
