@@ -2,6 +2,8 @@ use std::sync::mpsc::sync_channel;
 
 use color_eyre::Result;
 
+mod widgets;
+
 mod app;
 use app::App;
 

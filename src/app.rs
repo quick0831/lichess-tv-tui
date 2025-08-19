@@ -9,7 +9,7 @@ use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind};
 use ratatui::{
     DefaultTerminal, Frame,
     buffer::Buffer,
-    layout::Rect,
+    layout::{Alignment, Constraint, Layout, Rect},
     style::Stylize,
     symbols::border,
     text::{Line, Text},
@@ -17,7 +17,7 @@ use ratatui::{
 };
 use shakmaty::fen::Fen;
 
-use crate::api::TvData;
+use crate::{api::TvData, widgets::board::ChessBoard};
 
 #[derive(Debug)]
 pub struct App {
@@ -97,19 +97,25 @@ impl Widget for &App {
             .title(title.centered())
             .title_bottom(instructions.centered())
             .border_set(border::THICK);
+        let inner_area = block.inner(area);
 
-        let mut counter_text = Text::from(vec![Line::from(vec![
+        let counter_text = Text::from(vec![Line::from(vec![
             "Fullmoves: ".into(),
             self.data.as_setup().fullmoves.to_string().into(),
         ])]);
 
-        for line in format!("{:?}", self.data.as_setup().board).split("\n") {
-            counter_text.push_line(line.to_owned());
-        }
+        let board = ChessBoard::new(self.data.clone()).alignment(Alignment::Right);
+
+        let layout = Layout::horizontal([Constraint::Fill(1); 2])
+            .spacing(2)
+            .split(inner_area);
+
+        block.render(area, buf);
+
+        board.render(layout[0], buf);
 
         Paragraph::new(counter_text)
-            .centered()
-            .block(block)
-            .render(area, buf);
+            .left_aligned()
+            .render(layout[1], buf);
     }
 }
