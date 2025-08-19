@@ -6,14 +6,11 @@ use std::{
 use color_eyre::Result;
 
 use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind};
+use ratatui::prelude::*;
 use ratatui::{
-    DefaultTerminal, Frame,
-    buffer::Buffer,
-    layout::{Alignment, Constraint, Layout, Rect},
-    style::Stylize,
+    DefaultTerminal,
     symbols::border,
-    text::{Line, Text},
-    widgets::{Block, Paragraph, Widget},
+    widgets::{Block, Paragraph},
 };
 use shakmaty::fen::Fen;
 
