@@ -101,7 +101,7 @@ impl Widget for &App {
             self.data.as_setup().fullmoves.to_string().into(),
         ])]);
 
-        let board = ChessBoard::new(self.data.clone()).alignment(Alignment::Right);
+        let board = ChessBoard::new(self.data.as_setup().board.clone()).alignment(Alignment::Right);
 
         let layout = Layout::horizontal([Constraint::Fill(1); 2])
             .spacing(2)

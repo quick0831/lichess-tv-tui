@@ -1,16 +1,15 @@
 use ratatui::prelude::*;
 use ratatui::widgets::canvas::{Canvas, Painter, Shape};
-use shakmaty::fen::Fen;
-use shakmaty::{File, Rank, Role, Square};
+use shakmaty::{Board, File, Rank, Role, Square};
 
 #[derive(Debug)]
 pub struct ChessBoard {
     alignment: Alignment,
-    data: Fen,
+    data: Board,
 }
 
 impl ChessBoard {
-    pub fn new(data: Fen) -> Self {
+    pub fn new(data: Board) -> Self {
         ChessBoard {
             alignment: Alignment::Center,
             data,
@@ -31,7 +30,7 @@ impl Widget for ChessBoard {
         for f in 0..=7 {
             for r in 0..=7 {
                 let sq = Square::from_coords(File::new(f), Rank::new(r));
-                let shape = self.data.as_setup().board.piece_at(sq).map(|piece| {
+                let shape = self.data.piece_at(sq).map(|piece| {
                     let fg_color = match piece.color {
                         shakmaty::Color::Black => Color::Black,
                         shakmaty::Color::White => Color::White,
